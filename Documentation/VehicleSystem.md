@@ -1,56 +1,70 @@
-# Animal Combat Racing — Vehicle System & Physics Decision
+# Animal Combat Racing — Vehicle System Specification
 
-**Status:** LOCKED (Phase 1 Sign-Off)  
-**Physics Model:** Simplified Arcade Movement (4-Point Raycast Suspension + Custom Rigidbody Forces)  
+**Status:** IMPLEMENTED (Phase 2 Milestone)  
+**Physics Model:** Simplified Arcade Movement (4-Point Raycast Suspension + Contact-Point Forces)  
 **WheelCollider Usage:** NONE (Strictly Prohibited)  
 
 ---
 
-## 1. Locked Decision: Simplified Arcade Movement
+## 1. Architecture Overview
+The vehicle system is strictly decoupled into a data-driven model and a modular physics worker:
 
-We have evaluated both approaches against the project's 4 Design Pillars and mobile hardware constraints. The decision is formally locked:
+```
+[VehicleDataSO] (ScriptableObject Asset)
+      │
+      │ (Configures mass, topSpeed, accel, suspension, grip, nitro)
+      ▼
+[VehicleController] (MonoBehaviour on Rigidbody)
+      │
+      ├── 4x Wheel Sockets (FL, FR, RL, RR)
+      │     └── Physics.Raycast(wheel.position, -transform.up, maxRayLength)
+      │
+      ├── Suspension Calculation (Spring Force + Damper Force at contact)
+      ├── Drive Force (Applied at grounded wheel positions)
+      └── Lateral Grip Force (Cancels perpendicular sliding velocity)
+```
 
-### Why Simplified Arcade Raycast Suspension Was Chosen:
-1. **Pillar 3 (One-Thumb Mastery)**:
-   * Raycast suspension provides 100% deterministic, controllable handling curves.
-   * Enables immediate, responsive drift steering with zero simulation latency.
-   * `WheelCollider` models complex tire slip curves ($Pacejka$) designed for simulation racing, which feel unresponsive, sluggish, or erratic with mobile touch inputs.
-
-2. **Pillar 4 (Personality Over Realism)**:
-   * Exaggerated cartoon jump dynamics, springy suspension squash/stretch, and lateral bump impulses are trivial to compute and tune with custom forces.
-   * Prevents realistic vehicle rollovers. `WheelCollider` vehicles frequently flip upside down when hitting curbs at high speeds.
-
-3. **Mobile Performance (Samsung Galaxy A53 5G Reference)**:
-   * 4 downward raycasts per kart have virtually zero CPU footprint.
-   * PhysX `WheelCollider` runs sub-stepping calculations on internal friction models, causing noticeable frame drops when 8 karts cluster together on mobile chips.
-
----
-
-## 2. Mathematical Suspension Model
-
-Each vehicle executes 4 downward raycasts from predefined wheel anchor sockets ($FL, FR, RL, RR$):
-
-$$F_{\text{suspension}} = \max\left(0, (L_{\text{rest}} - d_{\text{hit}}) \cdot k_{\text{spring}} - v_{\text{relative}} \cdot c_{\text{damper}}\right)$$
-
-Where:
-* $L_{\text{rest}}$ = Resting suspension spring length (typically 0.55m).
-* $d_{\text{hit}}$ = Raycast hit distance to track geometry.
-* $k_{\text{spring}}$ = Spring stiffness coefficient ($120 - 180\text{ N/m}$).
-* $c_{\text{damper}}$ = Damping coefficient ($8 - 14\text{ Ns/m}$) to eliminate bouncing oscillations.
+### Design Pillars Served:
+* **Pillar 3 (*One-Thumb Mastery*)**: 
+  * `highSpeedSteerRetention` (0.4) reduces max steering sensitivity as speed increases, preventing twitchy over-steering at top speed.
+  * Deterministic raycast physics ensures predictable handling curves.
+* **Pillar 4 (*Personality Over Realism*)**: 
+  * Spring stiffness and damping produce bouncy cartoon suspension without tipping over.
+  * Low center of mass (`rb.centerOfMass = new Vector3(0, -0.5f, 0)`) prevents rollovers on aggressive turns.
 
 ---
 
-## 3. Lateral Friction & Drift Model
+## 2. Component API Reference
 
-Lateral tire grip is modeled by dynamically canceling perpendicular velocity:
+### `VehicleDataSO` (`Assets/_Project/Scripts/Vehicle/VehicleDataSO.cs`)
+* `topSpeed` (float): Forward speed clamp (units/sec).
+* `accelerationForce` (float): Forward force applied per FixedUpdate during throttle.
+* `brakeForce` (float): Reverse force applied when braking.
+* `coastingDrag` (float): Passive rolling resistance to stop runaway rolling.
+* `maxSteerAngle` (float): Maximum wheel angle at low speed (degrees).
+* `steerSpeed` (float): Rate of steering angle interpolation.
+* `highSpeedSteerRetention` (float): Percentage of steer angle retained at max speed (0.0 to 1.0).
+* `suspensionRestDistance` (float): Resting spring distance from wheel socket (meters).
+* `springStrength` (float): Spring stiffness coefficient.
+* `springDamper` (float): Damper coefficient to prevent bouncing oscillations.
+* `wheelRadius` (float): Wheel radius added to raycast length.
+* `gripFactor` (float): Fraction of lateral sliding velocity cancelled at the tire contact patch (0.0 to 1.0).
+* `mass` (float): Rigidbody mass (kg).
 
-$$\vec{v}_{\text{lateral}} = (\vec{v} \cdot \hat{r}) \hat{r}$$
-$$\vec{F}_{\text{grip}} = -\vec{v}_{\text{lateral}} \cdot \mu_{\text{grip}} \cdot M$$
+### `VehicleController` (`Assets/_Project/Scripts/Vehicle/VehicleController.cs`)
+* `WheelGrounded` (bool[]): Read-only array reporting ground contact per wheel (FL, FR, RL, RR).
+* `VehicleData` (VehicleDataSO): Public reference to vehicle stat asset.
 
-Where:
-* $\hat{r}$ = Car's local right vector.
-* $\mu_{\text{grip}}$ = Dynamic grip factor ($0.95$ in normal driving; $0.75 - 0.82$ during active drift).
-* $M$ = Vehicle mass.
+---
 
-When exiting a drift of $\ge 1.0\text{ second}$, a mini-turbo forward impulse is applied:
-$$\vec{F}_{\text{boost}} = \hat{f} \cdot I_{\text{driftBoost}}$$
+## 3. Phase 2 Scope Boundaries
+
+* **In Scope**:
+  * 4-point raycast suspension (ride height, spring force, damping).
+  * Acceleration, braking, coasting drag, and lateral grip cancellation at wheel contact points.
+  * Temporary debug input (`Vertical`, `Horizontal`, `Space`) for suspension and handling testing.
+* **Deferred to Later Phases**:
+  * Production Input System (`VehicleInput`) $\rightarrow$ **Phase 3**.
+  * Dynamic Camera $\rightarrow$ **Phase 4**.
+  * Nitro logic $\rightarrow$ **Phase 9**.
+  * Weapons & Health $\rightarrow$ **Phases 10 & 12**.

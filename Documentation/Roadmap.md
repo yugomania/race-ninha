@@ -3,7 +3,7 @@
 * [x] **PHASE 0**: Project Planning & Design Pillars Agreement
 * [x] **PHASE 0.5**: Throwaway Gray-Box Prototype (Fun Validation: 1 Car, 1 Loop/Jump, 1 Weapon)
 * [x] **PHASE 1**: Unity Project Setup & Vehicle Physics Approach Decision Sign-Off
-* [ ] **PHASE 2**: Basic Player Vehicle (Raycast Suspension, Rigidbody, Visual Sockets)
+* [x] **PHASE 2**: Basic Player Vehicle (Raycast Suspension, Rigidbody, Visual Sockets)
 * [ ] **PHASE 3**: Vehicle Controls (Touch Assists: Auto-Throttle, Steer Assist, Drift)
 * [ ] **PHASE 4**: Third-Person Adaptive Chase Camera (FOV Kick, Cam Shake, Lookahead)
 * [ ] **PHASE 5**: Basic Race Track (Prototype Loop with Elevation & Curbs)
