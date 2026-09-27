@@ -1,0 +1,17 @@
+{
+    "name": "ACR.Combat",
+    "rootNamespace": "ACR.Combat",
+    "references": [
+        "ACR.Core",
+        "ACR.Vehicle"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

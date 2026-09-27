@@ -1,0 +1,17 @@
+{
+    "name": "ACR.Race",
+    "rootNamespace": "ACR.Race",
+    "references": [
+        "ACR.Core",
+        "ACR.Vehicle"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

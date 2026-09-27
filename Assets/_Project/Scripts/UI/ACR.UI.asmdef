@@ -1,0 +1,19 @@
+{
+    "name": "ACR.UI",
+    "rootNamespace": "ACR.UI",
+    "references": [
+        "ACR.Core",
+        "ACR.Vehicle",
+        "ACR.Race",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
