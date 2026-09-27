@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>ACR: Phase 0.5 Throwaway Gray-Box Prototype</title>
+    <script src="three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+            font-family: monospace;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #111827;
+            color: #ffffff;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .telemetry-card {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(17, 24, 39, 0.85);
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .telemetry-card b {
+            color: #38bdf8;
+        }
+        .test-goal-banner {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(31, 41, 55, 0.9);
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.85rem;
+            color: #fef08a;
+            max-width: 320px;
+            z-index: 10;
+        }
+        .touch-pad {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+        }
+        .touch-btn {
+            width: 75px;
+            height: 75px;
+            border-radius: 12px;
+            background: #374151;
+            border: 2px solid #9ca3af;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .btn-fire {
+            background: #dc2626;
+            border-color: #f87171;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+        }
+        .steer-touch {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="telemetry-card">
+        <div><b>PHASE 0.5 GRAY-BOX TEST BENCH</b></div>
+        <div>SPEED: <span id="speed-val">0</span> KM/H</div>
+        <div>GROUNDED: <span id="ground-val" style="color:#10b981;">YES</span></div>
+        <div style="margin-top:6px; font-size:0.8rem; color:#9ca3af;">
+            [W/S] Throttle/Brake<br>
+            [A/D] Steer | [SHIFT] Drift<br>
+            [SPACE] Homing Missile<br>
+            [R] Reset Position
+        </div>
+    </div>
+
+    <div class="test-goal-banner">
+        <b>GOAL OF PHASE 0.5:</b><br>
+        Answer: <i>"Is driving over the ramp + drifting through the chicane + firing one homing missile fun for 5 minutes?"</i>
+    </div>
+
+    <div class="steer-touch">
+        <div class="touch-btn" id="touch-left">◀</div>
+        <div class="touch-btn" id="touch-right">▶</div>
+    </div>
+    <div class="touch-pad">
+        <div class="touch-btn btn-fire" id="touch-fire">🚀 FIRE</div>
+        <div class="touch-btn" id="touch-gas">⚡ GAS</div>
+    </div>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1f2937);
+        scene.fog = new THREE.Fog(0x1f2937, 50, 250);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.2);
+        light.position.set(40, 80, 40);
+        light.castShadow = true;
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x4b5563, 0.8));
+
+        // 1. Grid Floor
+        const gridHelper = new THREE.GridHelper(400, 80, 0x4b5563, 0x374151);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        const groundPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(500, 500),
+            new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 })
+        );
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.receiveShadow = true;
+        scene.add(groundPlane);
+
+        // 2. Graybox Jump Ramp
+        const ramp = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 0.6, 16),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 })
+        );
+        ramp.position.set(0, 1.8, 45);
+        ramp.rotation.x = -0.25;
+        ramp.castShadow = true;
+        ramp.receiveShadow = true;
+        scene.add(ramp);
+
+        // 3. Graybox Chicane Obstacles
+        const chicaneBlocks = [];
+        for (let i = 0; i < 4; i++) {
+            const block = new THREE.Mesh(
+                new THREE.BoxGeometry(8, 2.5, 2),
+                new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 })
+            );
+            const xOffset = (i % 2 === 0) ? -6 : 6;
+            block.position.set(xOffset, 1.25, 90 + i * 22);
+            block.castShadow = true;
+            scene.add(block);
+            chicaneBlocks.push(block);
+        }
+
+        // 4. Dummy Target Karts
+        const dummyKarts = [];
+        const dummyPositions = [[4, 25], [-4, 75], [0, 150]];
+        dummyPositions.forEach((pos, idx) => {
+            const dummy = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 1.0, 4.0),
+                new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.4 })
+            );
+            dummy.position.set(pos[0], 0.6, pos[1]);
+            dummy.castShadow = true;
+            dummy.spinTimer = 0;
+            scene.add(dummy);
+            dummyKarts.push(dummy);
+        });
+
+        // 5. Prototype Capsule Vehicle
+        const car = new THREE.Group();
+        const chassis = new THREE.Mesh(
+            new THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(1.0, 2.4, 4, 8) : new THREE.CylinderGeometry(1.0, 1.0, 2.8, 8),
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+        );
+        chassis.rotation.x = Math.PI / 2;
+        chassis.position.y = 0.8;
+        chassis.castShadow = true;
+        car.add(chassis);
+
+        // 4 Wheels
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+        [[-1.2, 0.45, 1.3], [1.2, 0.45, 1.3], [-1.2, 0.45, -1.3], [1.2, 0.45, -1.3]].forEach(wp => {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 12), wheelMat);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(wp[0], wp[1], wp[2]);
+            car.add(wheel);
+        });
+
+        car.position.set(0, 0.5, 0);
+        scene.add(car);
+
+        // Vehicle Physics State
+        let speed = 0;
+        let maxSpeed = 30; // m/s (~108 km/h)
+        let accel = 25;
+        let steerAngle = 0;
+        let velocityY = 0;
+        let isGrounded = true;
+        let isDrifting = false;
+        let driftTimer = 0;
+
+        // Active Missiles
+        const activeMissiles = [];
+
+        function fireMissile() {
+            // Find closest dummy target ahead
+            let bestTarget = null;
+            let closestDist = Infinity;
+            dummyKarts.forEach(d => {
+                const toDummy = d.position.clone().sub(car.position);
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(car.quaternion);
+                if (toDummy.dot(forward) > 0) {
+                    const dist = toDummy.length();
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        bestTarget = d;
+                    }
+                }
+            });
+
+            const missile = new THREE.Mesh(
+                new THREE.SphereGeometry(0.45, 8, 8),
+                new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626 })
+            );
+            missile.position.copy(car.position).add(new THREE.Vector3(0, 1.0, 0));
+            missile.target = bestTarget;
+            missile.life = 2.5;
+            missile.velocity = new THREE.Vector3(0, 0, 1).applyQuaternion(car.quaternion).multiplyScalar(45);
+            scene.add(missile);
+            activeMissiles.push(missile);
+        }
+
+        // Input
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.code === 'Space') fireMissile();
+            if (e.code === 'KeyR') resetCar();
+        });
+        window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+        let touchLeft = false, touchRight = false, touchGas = false;
+        document.getElementById('touch-left').addEventListener('pointerdown', () => touchLeft = true);
+        document.getElementById('touch-left').addEventListener('pointerup', () => touchLeft = false);
+        document.getElementById('touch-right').addEventListener('pointerdown', () => touchRight = true);
+        document.getElementById('touch-right').addEventListener('pointerup', () => touchRight = false);
+        document.getElementById('touch-gas').addEventListener('pointerdown', () => touchGas = true);
+        document.getElementById('touch-gas').addEventListener('pointerup', () => touchGas = false);
+        document.getElementById('touch-fire').addEventListener('pointerdown', () => fireMissile());
+
+        function resetCar() {
+            car.position.set(0, 0.5, 0);
+            car.rotation.set(0, 0, 0);
+            speed = 0;
+            velocityY = 0;
+        }
+
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            // Driving input
+            let throttle = 0;
+            if (keys['w'] || keys['arrowup'] || touchGas) throttle += 1;
+            if (keys['s'] || keys['arrowdown']) throttle -= 0.6;
+
+            let steer = 0;
+            if (keys['a'] || keys['arrowleft'] || touchLeft) steer -= 1;
+            if (keys['d'] || keys['arrowright'] || touchRight) steer += 1;
+
+            isDrifting = keys['shift'];
+
+            // Speed update
+            if (throttle !== 0) {
+                speed = Math.min(maxSpeed, Math.max(-10, speed + throttle * accel * dt));
+            } else {
+                speed = Math.max(0, speed - 15 * dt); // coast friction
+            }
+
+            // Steering with speed sensitivity
+            const speedFactor = Math.min(1.0, Math.abs(speed) / 8);
+            const grip = isDrifting ? 0.7 : 0.95;
+            car.rotation.y -= steer * 2.2 * speedFactor * dt;
+
+            // Chassis drift roll
+            car.rotation.z = -steer * (isDrifting ? 0.18 : 0.08);
+
+            // Forward translation
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(car.quaternion);
+            car.position.addScaledVector(forward, speed * dt);
+
+            // Simple Raycast Ground / Ramp Detection
+            let targetY = 0.5;
+
+            // Check ramp collision (Z between 37 and 53, X within 5)
+            if (Math.abs(car.position.x) < 5 && car.position.z >= 37 && car.position.z <= 53) {
+                const rampProgress = (car.position.z - 37) / 16;
+                targetY = 0.5 + rampProgress * 3.5;
+                isGrounded = true;
+                velocityY = 0;
+            } else if (car.position.z > 53 && car.position.z < 75 && car.position.y > 0.5) {
+                // In air jumping off ramp!
+                isGrounded = false;
+                velocityY -= 20 * dt; // Gravity
+                car.position.y += velocityY * dt;
+                if (car.position.y <= 0.5) {
+                    car.position.y = 0.5;
+                    isGrounded = true;
+                    velocityY = 0;
+                }
+            } else {
+                car.position.y = 0.5;
+                isGrounded = true;
+            }
+
+            // Update Missiles
+            for (let i = activeMissiles.length - 1; i >= 0; i--) {
+                const m = activeMissiles[i];
+                m.life -= dt;
+
+                if (m.target != null) {
+                    const toTarget = m.target.position.clone().sub(m.position).normalize();
+                    m.velocity.lerp(toTarget.multiplyScalar(45), 6 * dt);
+                }
+
+                m.position.addScaledVector(m.velocity, dt);
+
+                // Collision check with targets
+                dummyKarts.forEach(d => {
+                    if (m.position.distanceTo(d.position) < 3.0) {
+                        d.spinTimer = 1.8;
+                        m.life = 0;
+                    }
+                });
+
+                if (m.life <= 0) {
+                    scene.remove(m);
+                    activeMissiles.splice(i, 1);
+                }
+            }
+
+            // Update Dummy Karts (Spinout animation when hit)
+            dummyKarts.forEach(d => {
+                if (d.spinTimer > 0) {
+                    d.spinTimer -= dt;
+                    d.rotation.y += 14 * dt;
+                }
+            });
+
+            // Camera Chase
+            const camOffset = forward.clone().multiplyScalar(-9).add(new THREE.Vector3(0, 4.2, 0));
+            const camTarget = car.position.clone().add(camOffset);
+            camera.position.lerp(camTarget, 0.15);
+            camera.lookAt(car.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
+
+            // Telemetry
+            document.getElementById('speed-val').innerText = Math.round(speed * 3.6);
+            document.getElementById('ground-val').innerText = isGrounded ? 'YES' : 'AIRBORNE! 🚀';
+            document.getElementById('ground-val').style.color = isGrounded ? '#10b981' : '#f59e0b';
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
