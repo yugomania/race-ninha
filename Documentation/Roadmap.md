@@ -7,7 +7,7 @@
 * [x] **PHASE 3**: Vehicle Controls (Touch Assists: Auto-Throttle, Steer Assist, Drift)
 * [x] **PHASE 4**: Third-Person Adaptive Chase Camera (FOV Kick, Cam Shake, Lookahead)
 * [x] **PHASE 5**: Basic Race Track (Prototype Loop with Elevation & Curbs)
-* [ ] **PHASE 6**: Race Start Countdown (3-2-1-GO State Machine & Controls Lock)
+* [x] **PHASE 6**: Race Start Countdown (3-2-1-GO State Machine & Controls Lock)
 * [ ] **PHASE 7**: Race Completion System (Checkpoints, Anti-Cheat, Placement)
 * [ ] **PHASE 8**: AI Opponent Vehicles (Spline Following & Obstacle Avoidance)
 * [ ] **PHASE 9**: Nitro Boost System (Tank Accumulation, Boost Physics, Flames)

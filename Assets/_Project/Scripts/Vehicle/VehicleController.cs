@@ -42,11 +42,25 @@ namespace ACR.Vehicle
 
         private Rigidbody rb;
         private float currentSteerAngle;
+        private bool controlsLocked;
 
         // Per-wheel runtime state, exposed read-only for debugging/visuals (e.g. wheel spin, suspension compression)
         public bool[] WheelGrounded { get; private set; }
         public VehicleDataSO VehicleData => vehicleData;
         public IVehicleInputSource InputSource => inputSource;
+        public bool ControlsLocked => controlsLocked;
+
+        /// <summary>
+        /// Called by RaceCountdownController during Staging/CountingDown (Phase 6). While locked,
+        /// throttle/steer are forced to zero and brake is force-held, so a car on a banked or sloped
+        /// grid position doesn't drift before the race actually starts — this is a physics-level lock,
+        /// not just "ignore input," because gravity/slope forces still act on the rigidbody regardless
+        /// of what the input source reports.
+        /// </summary>
+        public void SetControlsLocked(bool locked)
+        {
+            controlsLocked = locked;
+        }
 
         private void Awake()
         {
@@ -83,9 +97,24 @@ namespace ACR.Vehicle
         {
             if (vehicleData == null) return;
 
-            float throttleInput = inputSource != null ? inputSource.Throttle : 0f;
-            float steerInput = inputSource != null ? inputSource.Steer : 0f;
-            bool brakeInput = inputSource != null && inputSource.Brake;
+            float throttleInput;
+            float steerInput;
+            bool brakeInput;
+
+            if (controlsLocked)
+            {
+                // Auto-brake hold: force brake regardless of what the input source says, so
+                // slope/gravity can't roll the car during Staging/CountingDown.
+                throttleInput = 0f;
+                steerInput = 0f;
+                brakeInput = true;
+            }
+            else
+            {
+                throttleInput = inputSource != null ? inputSource.Throttle : 0f;
+                steerInput = inputSource != null ? inputSource.Steer : 0f;
+                brakeInput = inputSource != null && inputSource.Brake;
+            }
 
             ApplySuspensionAndDrive(throttleInput, steerInput, brakeInput);
         }
