@@ -11,12 +11,14 @@ namespace ACR.Vehicle
         public float Throttle { get; private set; }
         public float Steer { get; private set; }
         public bool Brake { get; private set; }
+        public bool NitroRequested { get; private set; }
 
         private void Update()
         {
             Throttle = Input.GetAxis("Vertical");
             Steer = Input.GetAxis("Horizontal");
             Brake = Input.GetKey(KeyCode.Space);
+            NitroRequested = Input.GetKey(KeyCode.LeftShift);
         }
     }
 }

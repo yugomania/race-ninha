@@ -1,6 +1,6 @@
 # Animal Combat Racing — Vehicle System Specification
 
-**Status:** IMPLEMENTED (Phase 3 Milestone: Vehicle Controls & Touch Assists)  
+**Status:** IMPLEMENTED (Phase 9 Milestone: Nitro Boost System & Physics Multiplier)  
 **Physics Model:** Simplified Arcade Movement (4-Point Raycast Suspension + Contact-Point Forces)  
 **WheelCollider Usage:** NONE (Strictly Prohibited)  
 
@@ -8,26 +8,28 @@
 
 ## 1. Architecture Overview: Decoupled Input & Control Pipeline
 
-In Phase 3, all hardcoded debug input was completely removed from `VehicleController`. Input is now abstracted via the `IVehicleInputSource` interface:
+Input is abstracted via the `IVehicleInputSource` interface, ensuring zero coupling between control methods, physics, and gameplay boosters:
 
 ```
 [Hardware / Input Layer]
   ├── Desktop / Editor ──────> [KeyboardVehicleInput] ──┐
   │                                                     │
-  └── Mobile Screen Zones ───> [TouchVehicleInput] ─────┼──> [IVehicleInputSource]
-                                 ├── Auto-Accelerate    │           │
-                                 └── Steer-Assist       │           ▼
-  (Future AI Driver in Phase 8) [AIVehicleDriver] ──────┘    [VehicleController]
-                                                               (Physics Only)
+  ├── Mobile Screen Zones ───> [TouchVehicleInput] ─────┼──> [IVehicleInputSource]
+  │                                  ├── Auto-Accelerate│           │
+  │                                  ├── Steer-Assist   │           ▼
+  │                                  └── Nitro Button   │    [VehicleController]
+  │                                                     │    (Raycast Suspension)
+  └── AI Autonomous Driver ──> [AIController] ──────────┘           │
+                                                                    ▼
+                                                             [NitroSystem]
+                                                             (Synchronous Tick)
 ```
 
 ### Design Pillars Served:
+* **Pillar 2 (*Always a Comeback*)**: 
+  Nitro provides rubber-banding burst acceleration, allowing trailing karts to close distance in straights and execute high-speed overtakes.
 * **Pillar 3 (*One-Thumb Mastery*)**: 
-  * `TouchVehicleInput` provides two essential mobile assists:
-    1. **`autoAccelerate`**: The player does not need to hold an acceleration button; throttle is pinned to 1.0 until braking, enabling true one-thumb steering.
-    2. **`steerAssist`**: Automatically and smoothly recenters steering (`steerAssistRecenterSpeed = 3f`) when the player lifts their thumb, preventing erratic fishtailing from thumb jitter.
-* **Modularity**:
-  * Because `VehicleController` only references `IVehicleInputSource`, AI drivers in Phase 8 will implement this exact same interface without requiring a single line of physics code to change.
+  Nitro is exposed as a discrete toggle/button (`SetNitroButtonHeld`) on touch, complementing one-thumb auto-accelerate and steer assist.
 
 ---
 
@@ -37,28 +39,31 @@ In Phase 3, all hardcoded debug input was completely removed from `VehicleContro
 ```csharp
 public interface IVehicleInputSource
 {
-    float Throttle { get; } // -1 (reverse) to +1 (forward)
-    float Steer { get; }    // -1 (left) to +1 (right)
-    bool Brake { get; }     // True when handbrake is active
+    float Throttle { get; }       // -1 (reverse) to +1 (forward)
+    float Steer { get; }          // -1 (left) to +1 (right)
+    bool Brake { get; }           // True when handbrake is active
+    bool NitroRequested { get; }  // True while nitro boost input is held
 }
 ```
 
-### `KeyboardVehicleInput` (`Assets/_Project/Scripts/Vehicle/KeyboardVehicleInput.cs`)
-* Reads `Input.GetAxis("Vertical")`, `Input.GetAxis("Horizontal")`, and `Input.GetKey(KeyCode.Space)`.
+### `NitroSystem` (`Assets/_Project/Scripts/Vehicle/NitroSystem.cs`)
+* **Synchronous Execution**: Has no independent `FixedUpdate` or `Update`. It is called directly from `VehicleController.FixedUpdate` via `bool Tick(bool requested, float deltaTime)`:
+  - Eliminates 1-frame timing discrepancies or component execution order lag.
+  - Returns `isBoosting` state in the exact physics step where drive forces are applied.
+* **Depletion & Recharge**:
+  - Depletion: $\text{CurrentNitro} = \max(0, \text{CurrentNitro} - \text{nitroDepletionRate} \times \Delta t)$
+  - Recharge: $\text{CurrentNitro} = \min(\text{MaxNitro}, \text{CurrentNitro} + \text{nitroRechargeRate} \times \Delta t)$
+* **Screen-Space Feedback**:
+  - On the rising edge (`isBoosting && !wasBoosting`), triggers `cameraController.TriggerFOVKick(8f, 0.4f)` using the centralized Phase 4 camera hook.
 
-### `TouchVehicleInput` (`Assets/_Project/Scripts/Vehicle/TouchVehicleInput.cs`)
-* **Left Screen Half**: Steering zone via horizontal touch dragging from touch origin (`steerDragRangePixels = 200f`).
-* **Right Screen Half**: Throttle touch zone (accelerates on touch down).
-* `autoAccelerate` (bool): When true, throttle is constantly 1.0.
-* `steerAssist` (bool): When true, steering returns smoothly to 0.0 when no active drag is detected.
+### `VehicleController` Boost Physics
+When boosting:
+$$\text{effectiveTopSpeed} = \text{vehicleData.topSpeed} \times \text{vehicleData.nitroBoostMultiplier}$$
+$$\text{effectiveAccelerationForce} = \text{vehicleData.accelerationForce} \times \text{vehicleData.nitroBoostMultiplier}$$
+* While `controlsLocked == true` (Countdown Staging), nitro is strictly suppressed (`nitroRequested = false`).
 
-### `VehicleController` (`Assets/_Project/Scripts/Vehicle/VehicleController.cs`)
-* Accepts any `IVehicleInputSource` via `[SerializeField] private MonoBehaviour inputSourceBehaviour` or runtime `SetInputSource(IVehicleInputSource source)`.
-
----
-
-## 3. Testing & Verification
-
-Attach [`Phase3_TestHarness`](file:///C:/Users/PC/.gemini/antigravity/scratch/animal-combat-racing/Assets/_Project/Scripts/Vehicle/Phase3_TestHarness.cs) to an empty GameObject in any test scene.
-1. **Keyboard Verification**: Drive with `W/S` and `A/D`. Observe speed clamp and wheel turning.
-2. **Touch Verification**: Click `Active Source: Mobile Touch`. Drag the left half of the Game view to steer; toggle `Auto-Accelerate` and observe automatic cruising.
+### Data Tunables (`VehicleDataSO.cs`)
+* `nitroCapacity`: Default `100.0f`
+* `nitroRechargeRate`: Default `8.0f` units/sec
+* `nitroDepletionRate`: Default `25.0f` units/sec (4 seconds of continuous burn)
+* `nitroBoostMultiplier`: Default `1.4f` (+40% top speed and acceleration force)

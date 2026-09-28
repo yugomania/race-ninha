@@ -34,6 +34,9 @@ namespace ACR.AI
         public float Throttle { get; private set; }
         public float Steer { get; private set; }
         public bool Brake { get; private set; }
+        // AI nitro use is a later "add intelligence" item per the roadmap, not Phase 9 scope —
+        // always false for now so AI vehicles simply never use nitro yet.
+        public bool NitroRequested => false;
 
         public int TargetCheckpointIndex => targetCheckpointIndex;
         public TrackManager Track => trackManager;

@@ -31,10 +31,22 @@ namespace ACR.Vehicle
         public float Throttle { get; private set; }
         public float Steer { get; private set; }
         public bool Brake { get; private set; }
+        public bool NitroRequested { get; private set; }
 
         private int steerTouchId = -1;
         private Vector2 steerTouchStartPos;
         private bool throttleTouchActive;
+
+        /// <summary>
+        /// Called externally by a nitro button's press/release handler (a temporary OnGUI button for
+        /// now — Phase 15's real HUD button will call this exact method on pointer down/up, so this
+        /// won't need to change when the polished UI arrives). Deliberately not screen-zone-parsed
+        /// like steer/throttle, since nitro is a discrete button press, not a drag gesture.
+        /// </summary>
+        public void SetNitroButtonHeld(bool held)
+        {
+            NitroRequested = held;
+        }
 
         private void Update()
         {

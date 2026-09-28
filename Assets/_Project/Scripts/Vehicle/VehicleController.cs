@@ -43,12 +43,14 @@ namespace ACR.Vehicle
         private Rigidbody rb;
         private float currentSteerAngle;
         private bool controlsLocked;
+        private NitroSystem nitroSystem;
 
         // Per-wheel runtime state, exposed read-only for debugging/visuals (e.g. wheel spin, suspension compression)
         public bool[] WheelGrounded { get; private set; }
         public VehicleDataSO VehicleData => vehicleData;
         public IVehicleInputSource InputSource => inputSource;
         public bool ControlsLocked => controlsLocked;
+        public NitroSystem NitroSystem => nitroSystem;
 
         /// <summary>
         /// Called by RaceCountdownController during Staging/CountingDown (Phase 6). While locked,
@@ -73,6 +75,7 @@ namespace ACR.Vehicle
             rb.centerOfMass = new Vector3(0f, -0.5f, 0f);
 
             WheelGrounded = new bool[wheelSockets.Length];
+            nitroSystem = GetComponent<NitroSystem>();
 
             if (inputSourceBehaviour != null)
             {
@@ -100,31 +103,41 @@ namespace ACR.Vehicle
             float throttleInput;
             float steerInput;
             bool brakeInput;
+            bool nitroRequested;
 
             if (controlsLocked)
             {
                 // Auto-brake hold: force brake regardless of what the input source says, so
-                // slope/gravity can't roll the car during Staging/CountingDown.
+                // slope/gravity can't roll the car during Staging/CountingDown. Nitro is locked
+                // out too — no boosting before the race actually starts.
                 throttleInput = 0f;
                 steerInput = 0f;
                 brakeInput = true;
+                nitroRequested = false;
             }
             else
             {
                 throttleInput = inputSource != null ? inputSource.Throttle : 0f;
                 steerInput = inputSource != null ? inputSource.Steer : 0f;
                 brakeInput = inputSource != null && inputSource.Brake;
+                nitroRequested = inputSource != null && inputSource.NitroRequested;
             }
 
-            ApplySuspensionAndDrive(throttleInput, steerInput, brakeInput);
+            bool isBoosting = nitroSystem != null && nitroSystem.Tick(nitroRequested, Time.fixedDeltaTime);
+
+            ApplySuspensionAndDrive(throttleInput, steerInput, brakeInput, isBoosting);
         }
 
-        private void ApplySuspensionAndDrive(float throttleInput, float steerInput, bool brakeInput)
+        private void ApplySuspensionAndDrive(float throttleInput, float steerInput, bool brakeInput, bool isBoosting)
         {
             Vector3 currentVelocity = GetLinearVelocity();
 
+            float boostMultiplier = isBoosting ? vehicleData.nitroBoostMultiplier : 1f;
+            float effectiveTopSpeed = vehicleData.topSpeed * boostMultiplier;
+            float effectiveAccelerationForce = vehicleData.accelerationForce * boostMultiplier;
+
             // Smoothly approach target steer angle, reduced at high speed for stability.
-            float speedFactor = Mathf.Clamp01(currentVelocity.magnitude / vehicleData.topSpeed);
+            float speedFactor = Mathf.Clamp01(currentVelocity.magnitude / effectiveTopSpeed);
             float steerRetention = Mathf.Lerp(1f, vehicleData.highSpeedSteerRetention, speedFactor);
             float targetSteerAngle = steerInput * vehicleData.maxSteerAngle * steerRetention;
             currentSteerAngle = Mathf.Lerp(currentSteerAngle, targetSteerAngle, Time.fixedDeltaTime * vehicleData.steerSpeed);
@@ -167,9 +180,9 @@ namespace ACR.Vehicle
                     if (Mathf.Abs(throttleInput) > 0.01f && !brakeInput)
                     {
                         float currentForwardSpeed = Vector3.Dot(currentVelocity, transform.forward);
-                        if (Mathf.Abs(currentForwardSpeed) < vehicleData.topSpeed)
+                        if (Mathf.Abs(currentForwardSpeed) < effectiveTopSpeed)
                         {
-                            Vector3 driveForce = transform.forward * (throttleInput * vehicleData.accelerationForce);
+                            Vector3 driveForce = transform.forward * (throttleInput * effectiveAccelerationForce);
                             rb.AddForceAtPosition(driveForce, wheel.position);
                         }
                     }

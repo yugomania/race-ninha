@@ -53,6 +53,10 @@ namespace ACR.Vehicle
         [Header("Nitro (used from Phase 9 onward — stored here for data-driven consistency)")]
         public float nitroCapacity = 100f;
         public float nitroRechargeRate = 8f;
+        [Tooltip("Nitro units drained per second while boosting.")]
+        public float nitroDepletionRate = 25f;
+        [Tooltip("Multiplier applied to top speed and acceleration force while boosting.")]
+        public float nitroBoostMultiplier = 1.4f;
 
         [Header("Weapons (used from Phase 10 onward)")]
         public int weaponCapacity = 1;

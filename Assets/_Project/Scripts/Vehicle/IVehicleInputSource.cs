@@ -17,5 +17,8 @@ namespace ACR.Vehicle
 
         /// <summary>True while the brake/handbrake input is held.</summary>
         bool Brake { get; }
+
+        /// <summary>True while the nitro input is held/active.</summary>
+        bool NitroRequested { get; }
     }
 }
