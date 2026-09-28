@@ -6,16 +6,20 @@ namespace ACR.Vehicle
     /// Production vehicle controller using raycast suspension (our locked physics approach —
     /// see VEHICLE PHYSICS APPROACH decision, not WheelCollider).
     ///
-    /// Phase 2 scope ONLY:
+    /// Phase 2 scope:
     ///   - Raycast suspension per wheel (ride height, spring force, damping)
     ///   - Forward acceleration + steering applied at wheel contact points
     ///   - Reads all tunable values from VehicleDataSO (no hard-coded stats)
     ///
-    /// NOT in scope for Phase 2 (comes later):
-    ///   - Real input system (VehicleInput) — Phase 3. This file has a temporary
-    ///     debug input block clearly marked below so we can test suspension NOW.
-    ///   - Nitro, weapons, health — later phases, fields already reserved on VehicleDataSO.
+    /// Phase 3 update:
+    ///   - Input now comes from any IVehicleInputSource (KeyboardVehicleInput for
+    ///     editor/desktop, TouchVehicleInput for mobile) rather than a hard-coded debug block.
+    ///   - VehicleController has zero knowledge of *how* input is captured — decoupling
+    ///     enables AI, touch, and gamepad to drive the exact same physics code.
     ///
+    /// NOT in scope yet (later phases):
+    ///   - Nitro, weapons, health — fields already reserved on VehicleDataSO.
+    /// 
     /// Serves Pillars: "One-Thumb Mastery" & "Personality Over Realism".
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
@@ -29,13 +33,20 @@ namespace ACR.Vehicle
         [Tooltip("Which sockets steer. Default: first two (front wheels).")]
         [SerializeField] private int steeringWheelCount = 2;
 
+        [Header("Input")]
+        [Tooltip("Assign a KeyboardVehicleInput or TouchVehicleInput component (or any IVehicleInputSource). " +
+                 "If left empty, this vehicle will not respond to input — useful for AI-driven vehicles later, " +
+                 "which will supply their own AIController implementing this same interface.")]
+        [SerializeField] private MonoBehaviour inputSourceBehaviour;
+        private IVehicleInputSource inputSource;
+
         private Rigidbody rb;
         private float currentSteerAngle;
 
         // Per-wheel runtime state, exposed read-only for debugging/visuals (e.g. wheel spin, suspension compression)
         public bool[] WheelGrounded { get; private set; }
-
         public VehicleDataSO VehicleData => vehicleData;
+        public IVehicleInputSource InputSource => inputSource;
 
         private void Awake()
         {
@@ -48,17 +59,33 @@ namespace ACR.Vehicle
             rb.centerOfMass = new Vector3(0f, -0.5f, 0f);
 
             WheelGrounded = new bool[wheelSockets.Length];
+
+            if (inputSourceBehaviour != null)
+            {
+                inputSource = inputSourceBehaviour as IVehicleInputSource;
+                if (inputSource == null)
+                {
+                    Debug.LogError($"{name}: assigned inputSourceBehaviour does not implement IVehicleInputSource.", this);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Allows runtime assignment of input source (used by spawners, test harnesses, and AI controllers).
+        /// </summary>
+        public void SetInputSource(IVehicleInputSource source)
+        {
+            inputSource = source;
+            inputSourceBehaviour = source as MonoBehaviour;
         }
 
         private void FixedUpdate()
         {
             if (vehicleData == null) return;
 
-            // --- TEMPORARY DEBUG INPUT — replace with VehicleInput in Phase 3 ---
-            float throttleInput = Input.GetAxis("Vertical");
-            float steerInput = Input.GetAxis("Horizontal");
-            bool brakeInput = Input.GetKey(KeyCode.Space);
-            // --- END TEMPORARY DEBUG INPUT ---
+            float throttleInput = inputSource != null ? inputSource.Throttle : 0f;
+            float steerInput = inputSource != null ? inputSource.Steer : 0f;
+            bool brakeInput = inputSource != null && inputSource.Brake;
 
             ApplySuspensionAndDrive(throttleInput, steerInput, brakeInput);
         }
@@ -141,7 +168,6 @@ namespace ACR.Vehicle
             }
         }
 
-        // Helper to ensure compatibility across Unity 2022.3 LTS and Unity 6
         private Vector3 GetLinearVelocity()
         {
 #if UNITY_6000_0_OR_NEWER

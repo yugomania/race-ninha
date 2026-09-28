@@ -1,70 +1,64 @@
 # Animal Combat Racing — Vehicle System Specification
 
-**Status:** IMPLEMENTED (Phase 2 Milestone)  
+**Status:** IMPLEMENTED (Phase 3 Milestone: Vehicle Controls & Touch Assists)  
 **Physics Model:** Simplified Arcade Movement (4-Point Raycast Suspension + Contact-Point Forces)  
 **WheelCollider Usage:** NONE (Strictly Prohibited)  
 
 ---
 
-## 1. Architecture Overview
-The vehicle system is strictly decoupled into a data-driven model and a modular physics worker:
+## 1. Architecture Overview: Decoupled Input & Control Pipeline
+
+In Phase 3, all hardcoded debug input was completely removed from `VehicleController`. Input is now abstracted via the `IVehicleInputSource` interface:
 
 ```
-[VehicleDataSO] (ScriptableObject Asset)
-      │
-      │ (Configures mass, topSpeed, accel, suspension, grip, nitro)
-      ▼
-[VehicleController] (MonoBehaviour on Rigidbody)
-      │
-      ├── 4x Wheel Sockets (FL, FR, RL, RR)
-      │     └── Physics.Raycast(wheel.position, -transform.up, maxRayLength)
-      │
-      ├── Suspension Calculation (Spring Force + Damper Force at contact)
-      ├── Drive Force (Applied at grounded wheel positions)
-      └── Lateral Grip Force (Cancels perpendicular sliding velocity)
+[Hardware / Input Layer]
+  ├── Desktop / Editor ──────> [KeyboardVehicleInput] ──┐
+  │                                                     │
+  └── Mobile Screen Zones ───> [TouchVehicleInput] ─────┼──> [IVehicleInputSource]
+                                 ├── Auto-Accelerate    │           │
+                                 └── Steer-Assist       │           ▼
+  (Future AI Driver in Phase 8) [AIVehicleDriver] ──────┘    [VehicleController]
+                                                               (Physics Only)
 ```
 
 ### Design Pillars Served:
 * **Pillar 3 (*One-Thumb Mastery*)**: 
-  * `highSpeedSteerRetention` (0.4) reduces max steering sensitivity as speed increases, preventing twitchy over-steering at top speed.
-  * Deterministic raycast physics ensures predictable handling curves.
-* **Pillar 4 (*Personality Over Realism*)**: 
-  * Spring stiffness and damping produce bouncy cartoon suspension without tipping over.
-  * Low center of mass (`rb.centerOfMass = new Vector3(0, -0.5f, 0)`) prevents rollovers on aggressive turns.
+  * `TouchVehicleInput` provides two essential mobile assists:
+    1. **`autoAccelerate`**: The player does not need to hold an acceleration button; throttle is pinned to 1.0 until braking, enabling true one-thumb steering.
+    2. **`steerAssist`**: Automatically and smoothly recenters steering (`steerAssistRecenterSpeed = 3f`) when the player lifts their thumb, preventing erratic fishtailing from thumb jitter.
+* **Modularity**:
+  * Because `VehicleController` only references `IVehicleInputSource`, AI drivers in Phase 8 will implement this exact same interface without requiring a single line of physics code to change.
 
 ---
 
 ## 2. Component API Reference
 
-### `VehicleDataSO` (`Assets/_Project/Scripts/Vehicle/VehicleDataSO.cs`)
-* `topSpeed` (float): Forward speed clamp (units/sec).
-* `accelerationForce` (float): Forward force applied per FixedUpdate during throttle.
-* `brakeForce` (float): Reverse force applied when braking.
-* `coastingDrag` (float): Passive rolling resistance to stop runaway rolling.
-* `maxSteerAngle` (float): Maximum wheel angle at low speed (degrees).
-* `steerSpeed` (float): Rate of steering angle interpolation.
-* `highSpeedSteerRetention` (float): Percentage of steer angle retained at max speed (0.0 to 1.0).
-* `suspensionRestDistance` (float): Resting spring distance from wheel socket (meters).
-* `springStrength` (float): Spring stiffness coefficient.
-* `springDamper` (float): Damper coefficient to prevent bouncing oscillations.
-* `wheelRadius` (float): Wheel radius added to raycast length.
-* `gripFactor` (float): Fraction of lateral sliding velocity cancelled at the tire contact patch (0.0 to 1.0).
-* `mass` (float): Rigidbody mass (kg).
+### `IVehicleInputSource` (`Assets/_Project/Scripts/Vehicle/IVehicleInputSource.cs`)
+```csharp
+public interface IVehicleInputSource
+{
+    float Throttle { get; } // -1 (reverse) to +1 (forward)
+    float Steer { get; }    // -1 (left) to +1 (right)
+    bool Brake { get; }     // True when handbrake is active
+}
+```
+
+### `KeyboardVehicleInput` (`Assets/_Project/Scripts/Vehicle/KeyboardVehicleInput.cs`)
+* Reads `Input.GetAxis("Vertical")`, `Input.GetAxis("Horizontal")`, and `Input.GetKey(KeyCode.Space)`.
+
+### `TouchVehicleInput` (`Assets/_Project/Scripts/Vehicle/TouchVehicleInput.cs`)
+* **Left Screen Half**: Steering zone via horizontal touch dragging from touch origin (`steerDragRangePixels = 200f`).
+* **Right Screen Half**: Throttle touch zone (accelerates on touch down).
+* `autoAccelerate` (bool): When true, throttle is constantly 1.0.
+* `steerAssist` (bool): When true, steering returns smoothly to 0.0 when no active drag is detected.
 
 ### `VehicleController` (`Assets/_Project/Scripts/Vehicle/VehicleController.cs`)
-* `WheelGrounded` (bool[]): Read-only array reporting ground contact per wheel (FL, FR, RL, RR).
-* `VehicleData` (VehicleDataSO): Public reference to vehicle stat asset.
+* Accepts any `IVehicleInputSource` via `[SerializeField] private MonoBehaviour inputSourceBehaviour` or runtime `SetInputSource(IVehicleInputSource source)`.
 
 ---
 
-## 3. Phase 2 Scope Boundaries
+## 3. Testing & Verification
 
-* **In Scope**:
-  * 4-point raycast suspension (ride height, spring force, damping).
-  * Acceleration, braking, coasting drag, and lateral grip cancellation at wheel contact points.
-  * Temporary debug input (`Vertical`, `Horizontal`, `Space`) for suspension and handling testing.
-* **Deferred to Later Phases**:
-  * Production Input System (`VehicleInput`) $\rightarrow$ **Phase 3**.
-  * Dynamic Camera $\rightarrow$ **Phase 4**.
-  * Nitro logic $\rightarrow$ **Phase 9**.
-  * Weapons & Health $\rightarrow$ **Phases 10 & 12**.
+Attach [`Phase3_TestHarness`](file:///C:/Users/PC/.gemini/antigravity/scratch/animal-combat-racing/Assets/_Project/Scripts/Vehicle/Phase3_TestHarness.cs) to an empty GameObject in any test scene.
+1. **Keyboard Verification**: Drive with `W/S` and `A/D`. Observe speed clamp and wheel turning.
+2. **Touch Verification**: Click `Active Source: Mobile Touch`. Drag the left half of the Game view to steer; toggle `Auto-Accelerate` and observe automatic cruising.
