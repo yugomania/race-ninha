@@ -5,7 +5,7 @@
 * [x] **PHASE 1**: Unity Project Setup & Vehicle Physics Approach Decision Sign-Off
 * [x] **PHASE 2**: Basic Player Vehicle (Raycast Suspension, Rigidbody, Visual Sockets)
 * [x] **PHASE 3**: Vehicle Controls (Touch Assists: Auto-Throttle, Steer Assist, Drift)
-* [ ] **PHASE 4**: Third-Person Adaptive Chase Camera (FOV Kick, Cam Shake, Lookahead)
+* [x] **PHASE 4**: Third-Person Adaptive Chase Camera (FOV Kick, Cam Shake, Lookahead)
 * [ ] **PHASE 5**: Basic Race Track (Prototype Loop with Elevation & Curbs)
 * [ ] **PHASE 6**: Race Start Countdown (3-2-1-GO State Machine & Controls Lock)
 * [ ] **PHASE 7**: Race Completion System (Checkpoints, Anti-Cheat, Placement)
