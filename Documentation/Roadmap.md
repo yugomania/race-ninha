@@ -9,7 +9,7 @@
 * [x] **PHASE 5**: Basic Race Track (Prototype Loop with Elevation & Curbs)
 * [x] **PHASE 6**: Race Start Countdown (3-2-1-GO State Machine & Controls Lock)
 * [x] **PHASE 7**: Race Completion System (Checkpoints, Anti-Cheat, Placement)
-* [ ] **PHASE 8**: AI Opponent Vehicles (Spline Following & Obstacle Avoidance)
+* [x] **PHASE 8**: AI Opponent Vehicles (Spline Following & Obstacle Avoidance)
 * [ ] **PHASE 9**: Nitro Boost System (Tank Accumulation, Boost Physics, Flames)
 * [ ] **PHASE 10**: First Fictional Weapon + Object Pooling Architecture
 * [ ] **PHASE 11**: Combat System Architecture (Inventory Slot & Weapon Roulette)
