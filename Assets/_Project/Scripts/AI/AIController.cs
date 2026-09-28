@@ -37,6 +37,8 @@ namespace ACR.AI
         // AI nitro use is a later "add intelligence" item per the roadmap, not Phase 9 scope —
         // always false for now so AI vehicles simply never use nitro yet.
         public bool NitroRequested => false;
+        // Same deferral for weapon use — AI weapon use is a later roadmap item.
+        public bool WeaponFireRequested => false;
 
         public int TargetCheckpointIndex => targetCheckpointIndex;
         public TrackManager Track => trackManager;

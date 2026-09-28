@@ -12,6 +12,7 @@ namespace ACR.Vehicle
         public float Steer { get; private set; }
         public bool Brake { get; private set; }
         public bool NitroRequested { get; private set; }
+        public bool WeaponFireRequested { get; private set; }
 
         private void Update()
         {
@@ -19,6 +20,7 @@ namespace ACR.Vehicle
             Steer = Input.GetAxis("Horizontal");
             Brake = Input.GetKey(KeyCode.Space);
             NitroRequested = Input.GetKey(KeyCode.LeftShift);
+            WeaponFireRequested = Input.GetKey(KeyCode.LeftControl);
         }
     }
 }

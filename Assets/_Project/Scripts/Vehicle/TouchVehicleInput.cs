@@ -32,6 +32,7 @@ namespace ACR.Vehicle
         public float Steer { get; private set; }
         public bool Brake { get; private set; }
         public bool NitroRequested { get; private set; }
+        public bool WeaponFireRequested { get; private set; }
 
         private int steerTouchId = -1;
         private Vector2 steerTouchStartPos;
@@ -46,6 +47,13 @@ namespace ACR.Vehicle
         public void SetNitroButtonHeld(bool held)
         {
             NitroRequested = held;
+        }
+
+        /// <summary>Same pattern as SetNitroButtonHeld — called by a temporary test button now,
+        /// by Phase 15's real weapon-fire HUD button later.</summary>
+        public void SetWeaponButtonHeld(bool held)
+        {
+            WeaponFireRequested = held;
         }
 
         private void Update()

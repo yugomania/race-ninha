@@ -20,5 +20,8 @@ namespace ACR.Vehicle
 
         /// <summary>True while the nitro input is held/active.</summary>
         bool NitroRequested { get; }
+
+        /// <summary>True while the weapon-fire input is held/pressed.</summary>
+        bool WeaponFireRequested { get; }
     }
 }
